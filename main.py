@@ -9,53 +9,29 @@ st.set_page_config(page_title=APP_NAME, layout="wide", page_icon="🎮")
 
 # --- ระบบ Login ---
 def check_password():
-    """Returns True if the user had the correct password."""
-    def password_entered():
-        """Checks whether a password entered by the user is correct."""
-        if st.session_state["password"] == "159357159":
-            st.session_state["password_correct"] = True
-            del st.session_state["password"]  # ลบรหัสออกจาก session เพื่อความปลอดภัย
-        else:
-            st.session_state["password_correct"] = False
-
     if "password_correct" not in st.session_state:
-        # หน้าจอ Login
-        st.markdown("<h1 style='text-align: center;'>🔒 Restricted Access</h1>", unsafe_allow_value=True)
-        st.text_input(
-            "Please enter your password to access REDM ID HUB", 
-            type="password", 
-            on_change=password_entered, 
-            key="password"
-        )
+        st.subheader("🔒 Restricted Access")
+        password = st.text_input("Please enter your password", type="password")
+        if st.button("Login"):
+            if password == "159357159":
+                st.session_state["password_correct"] = True
+                st.rerun()
+            else:
+                st.error("รหัสผ่านไม่ถูกต้อง")
         return False
-    elif not st.session_state["password_correct"]:
-        # กรณีใส่รหัสผิด
-        st.markdown("<h1 style='text-align: center;'>🔒 Restricted Access</h1>", unsafe_allow_value=True)
-        st.text_input(
-            "Password incorrect, please try again", 
-            type="password", 
-            on_change=password_entered, 
-            key="password"
-        )
-        st.error("😕 รหัสผ่านไม่ถูกต้อง")
-        return False
-    else:
-        # รหัสผ่านถูกต้อง
-        return True
+    return True
 
 # --- ฟังก์ชันเชื่อมต่อ Google Sheets ---
 @st.cache_resource
 def connect_gsheet():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        
         if "gcp_service_account" in st.secrets:
             creds_info = dict(st.secrets["gcp_service_account"])
             creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
             creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
         else:
             creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
-            
         client = gspread.authorize(creds)
         sheet = client.open("RedM_Account_DB").get_worksheet(0)
         return sheet
@@ -66,7 +42,6 @@ def connect_gsheet():
 # --- เริ่มการทำงานของแอป ---
 if check_password():
     st.title(f"🎮 {APP_NAME}")
-    st.write(f"Logged in as Administrator")
     st.markdown("---")
 
     sheet = connect_gsheet()
