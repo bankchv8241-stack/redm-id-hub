@@ -9,7 +9,7 @@ from datetime import datetime
 APP_NAME = "REDM ID HUB PRO"
 st.set_page_config(page_title=APP_NAME, layout="wide", page_icon="🛡️")
 
-# --- 📍 Webhook URL ของคุณ 📍 ---
+# --- 📍 บรรทัดที่ 14: Webhook URL เดิมของคุณ 📍 ---
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1485029775729889551/BiNZOKI5QDMYp1IVCTKxrH6hMkfBOeip5lWHTh2y48dbvCzO8I7jX1AtAaVEkAXUZ74j" 
 
 # --- Custom CSS: Classic B&W ---
@@ -22,17 +22,9 @@ st.markdown("""
     .stButton>button { width: 100%; border-radius: 0px; border: 1px solid #FFFFFF; background-color: transparent; color: #FFFFFF; font-weight: bold; transition: all 0.4s ease; }
     .stButton>button:hover { border-color: #00FBFF !important; color: #00FBFF !important; box-shadow: 0 0 20px rgba(0, 251, 255, 0.4); }
     [data-testid="stVerticalBlockBorderWrapper"] { border: 1px solid #222 !important; background-color: #050505 !important; }
-    code { color: #00FBFF !important; background-color: #111 !important; border: 1px solid #222 !important; }
+    code { color: #00FBFF !important; background-color: #111 !important; border: 1px solid #222 !important; font-size: 14px; }
     </style>
     """, unsafe_allow_html=True)
-
-# --- ฟังก์ชันส่ง Discord ---
-def send_discord_log(action, detail):
-    if DISCORD_WEBHOOK_URL:
-        try:
-            data = {"embeds": [{"title": f"🔔 {action}", "description": detail, "color": 0x00fbff, "timestamp": datetime.now().isoformat()}]}
-            requests.post(DISCORD_WEBHOOK_URL, json=data)
-        except: pass
 
 # --- ระบบ Login ---
 def check_password():
@@ -62,16 +54,15 @@ def connect_gsheet():
         client = gspread.authorize(creds)
         spreadsheet = client.open("RedM_Account_DB")
         sheet = spreadsheet.get_worksheet(0)
-        try: log_sheet = spreadsheet.worksheet("Activity_Logs")
-        except: log_sheet = spreadsheet.add_worksheet(title="Activity_Logs", rows="100", cols="2")
-        return sheet, log_sheet
+        return sheet
     except Exception as e:
-        st.error(f"SYSTEM ERROR: {e}"); return None, None
+        st.error(f"SYSTEM ERROR: {e}"); return None
 
 # --- Main App ---
 if check_password():
-    st.markdown("<h1>REDM ID HUB PRO</h1>")
-    sheet, log_sheet = connect_gsheet()
+    # แก้ไขจุดที่เพี้ยน: เพิ่ม unsafe_allow_html=True ให้หัวข้อกลับมาสวยเหมือนเดิม
+    st.markdown("<h1>REDM ID HUB PRO</h1>", unsafe_allow_html=True)
+    sheet = connect_gsheet()
     
     if sheet:
         all_data = sheet.get_all_records()
@@ -96,8 +87,6 @@ if check_password():
                 if st.form_submit_button("🔥 บันทึกข้อมูลเข้าระบบ"):
                     new_row = [m_user, m_pass, s_id, s_pass, s_mail, s_tel, s_link, s_hex, d_mail, d_pass, d_tel, d_id, d_tag, rs_mail, rs_pass, rm_sv, rm_ip, rm_link, rm_ic, rm_role, rm_prof]
                     sheet.append_row(new_row)
-                    log_sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), f"เพิ่มข้อมูล: {rm_ic}"])
-                    send_discord_log("NEW IDENTITY", f"**IC:** {rm_ic}\n**Server:** {rm_sv}\n**Role:** {rm_role}")
                     st.success("บันทึกข้อมูลสำเร็จ!"); st.rerun()
 
         if not df.empty:
@@ -112,22 +101,20 @@ if check_password():
                         st.markdown(f"### {row_dict.get('Name_IC', 'N/A')} // {row_dict.get('Server', 'N/A')}")
                         st.write(f"🎭 **Role:** {row_dict.get('Role', 'N/A')} | 💼 **Job:** {row_dict.get('Profession', 'N/A')}")
                         
-                        # --- ส่วนปุ่มคัดลอกรายช่องข้อมูล ---
-                        if st.checkbox(f"🔓 เปิดดูและคัดลอกข้อมูลรายช่อง", key=f"v_{idx}"):
+                        # --- ระบบคัดลอกรายช่องข้อมูล ---
+                        if st.checkbox(f"🔓 เปิดดูข้อมูลและคัดลอกรายช่อง", key=f"v_{idx}"):
                             st.markdown("---")
-                            for key, value in row_dict.items():
-                                if value: # แสดงและให้ก๊อปปี้เฉพาะช่องที่มีข้อมูล
-                                    c_label, c_val, c_cp = st.columns([1.5, 3, 1])
-                                    c_label.markdown(f"**{key}:**")
+                            for label, value in row_dict.items():
+                                if value: # แสดงเฉพาะช่องที่มีข้อมูลเพื่อให้กด Copy ได้รายตัว
+                                    c_lab, c_val, c_cp = st.columns([1.5, 3, 1])
+                                    c_lab.markdown(f"**{label}:**")
                                     c_val.code(str(value), language="text")
-                                    if c_cp.button("📋 COPY", key=f"cp_{idx}_{key}"):
-                                        # ใช้ st.write หรือช่องทางอื่นหาก Streamlit เวอร์ชันคุณยังไม่รองรับ copy_to_clipboard โดยตรง
-                                        # แต่ส่วนใหญ่เวอร์ชันล่าสุดจะใช้เทคนิคสร้างช่อง text_area เล็กๆ หรือใช้ JS
+                                    if c_cp.button("📋 COPY", key=f"cp_{idx}_{label}"):
+                                        # ใช้คำสั่ง JavaScript เพื่อช่วยก๊อปปี้เข้า Clipboard ได้แม่นยำขึ้น
                                         st.write(f'<script>navigator.clipboard.writeText("{value}")</script>', unsafe_allow_html=True)
-                                        st.toast(f"คัดลอก {key} สำเร็จ!", icon="✅")
+                                        st.toast(f"คัดลอก {label} แล้ว!", icon="✅")
                     with col_btn:
                         st.code(row_dict.get('Steam_Hex', 'N/A'))
                         if st.button("🗑️ ลบข้อมูล", key=f"d_{idx}"):
                             sheet.delete_rows(idx + 2)
-                            send_discord_log("DELETE", f"ลบข้อมูล: {row_dict.get('Name_IC')}")
                             st.rerun()
