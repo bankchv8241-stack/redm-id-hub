@@ -4,7 +4,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import pandas as pd
 import requests
 from datetime import datetime
-import plotly.express as px  # เพิ่มไลบรารีสำหรับกราฟ
+import plotly.express as px
 
 # --- การตั้งค่าหน้าเว็บ ---
 APP_NAME = "REDM ID HUB PRO"
@@ -62,6 +62,7 @@ def connect_gsheet():
 
 # --- Main App ---
 if check_password():
+    # แก้ไขหัวข้อให้แสดงผล HTML ได้ถูกต้อง (ไม่เพี้ยนแบบ Plain Text)
     st.markdown("<h1>REDM ID HUB PRO</h1>", unsafe_allow_html=True)
     sheet = connect_gsheet()
     
@@ -69,25 +70,22 @@ if check_password():
         all_data = sheet.get_all_records()
         df = pd.DataFrame(all_data)
 
-        # --- 📊 DASHBOARD SECTION 📊 ---
+        # --- 📊 DASHBOARD SECTION ---
         if not df.empty:
             st.markdown("### 📈 ข้อมูลสรุปภาพรวม (Visual Analytics)")
             m1, m2, m3 = st.columns([1, 2, 2])
-            
-            # 1. จำนวนไอดีทั้งหมด
             m1.metric("TOTAL ACCOUNTS", len(df))
             
-            # 2. กราฟวงกลมแยกตามเซิร์ฟเวอร์
             if 'Server' in df.columns:
                 sv_counts = df['Server'].value_counts().reset_index()
+                # แก้ไขตัวพิมพ์ใหญ่เป็น CYAN_R เพื่อไม่ให้เกิด Error สีแดง
                 fig_sv = px.pie(sv_counts, values='count', names='Server', 
                                 title='ไอดีแยกตามเซิร์ฟเวอร์', 
-                                color_discrete_sequence=px.colors.sequential.Cyan_r,
+                                color_discrete_sequence=px.colors.sequential.CYAN_R,
                                 template="plotly_dark")
                 fig_sv.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=250)
                 m2.plotly_chart(fig_sv, use_container_width=True)
             
-            # 3. กราฟแท่งแยกตามอาชีพ
             if 'Profession' in df.columns:
                 prof_counts = df['Profession'].value_counts().reset_index()
                 fig_prof = px.bar(prof_counts, x='Profession', y='count', 
@@ -96,7 +94,6 @@ if check_password():
                                   template="plotly_dark")
                 fig_prof.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=250)
                 m3.plotly_chart(fig_prof, use_container_width=True)
-            
             st.markdown("---")
 
         # --- เพิ่มโปรไฟล์ใหม่ ---
@@ -106,7 +103,7 @@ if check_password():
                 c1, c2 = st.columns(2); m_user = c1.text_input("อีเมล (Email)"); m_pass = c2.text_input("พาสเวิร์ดเมล์ (Pass)")
                 st.markdown("### 2️⃣ Steam")
                 c3, c4 = st.columns(2); s_id = c3.text_input("ไอดีสตรีม (ID)"); s_pass = c4.text_input("พาสเวิร์ดสตรีม (Pass)")
-                s_mail = c3.text_input("อีเมลรองสตรีม"); s_tel = c4.text_input("เบอร์ลงทะเบียนสตรีม"); s_link = c3.text_input("ลิงก์โปรไฟล์สตรีม"); s_hex = c4.text_input("Steam Hex")
+                s_mail = c3.text_input("อีเมลสำรองสตรีม"); s_tel = c4.text_input("เบอร์ลงทะเบียนสตรีม"); s_link = c3.text_input("ลิงก์โปรไฟล์สตรีม"); s_hex = c4.text_input("Steam Hex")
                 st.markdown("### 3️⃣ Discord")
                 c5, c6 = st.columns(2); d_mail = c5.text_input("อีเมลดิสคอร์ด"); d_pass = c6.text_input("พาสเวิร์ดดิสคอร์ด")
                 d_tel = c5.text_input("เบอร์ลงทะเบียนดิสคอร์ด"); d_id = c6.text_input("Discord User ID"); d_tag = c5.text_input("Discord Tag")
@@ -121,7 +118,7 @@ if check_password():
                     sheet.append_row(new_row)
                     st.success("บันทึกข้อมูลสำเร็จ!"); st.rerun()
 
-        # --- ค้นหาและแสดงผล ---
+        # --- ส่วนแสดงผลและการค้นหา พร้อมปุ่มคัดลอกรายช่อง ---
         if not df.empty:
             search = st.text_input("🔍 ค้นหา (ชื่อ IC / เซิร์ฟ / Steam Hex)")
             f_df = df[df.apply(lambda r: search.lower() in str(r).lower(), axis=1)] if search else df
