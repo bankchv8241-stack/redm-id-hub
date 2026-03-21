@@ -5,19 +5,31 @@ import pandas as pd
 
 # --- การตั้งค่าหน้าเว็บ ---
 APP_NAME = "REDM ID HUB"
-st.set_page_config(page_title=APP_NAME, layout="wide")
+st.set_page_config(page_title=APP_NAME, layout="wide", page_icon="🎮")
 
 # --- ฟังก์ชันเชื่อมต่อ Google Sheets ---
+@st.cache_resource
 def connect_gsheet():
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
+        
+        # ตรวจสอบว่ารันบน Streamlit Cloud หรือไม่
+        if "gcp_service_account" in st.secrets:
+            # ดึงข้อมูลจาก Secrets และแปลงเป็น Dictionary
+            creds_info = dict(st.secrets["gcp_service_account"])
+            # สำคัญ: แก้ไขปัญหาเครื่องหมายเว้นบรรทัดใน Private Key
+            creds_info["private_key"] = creds_info["private_key"].replace("\\n", "\n")
+            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
+        else:
+            # สำหรับการรันบนเครื่องคอมพิวเตอร์ (Local)
+            creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
+            
         client = gspread.authorize(creds)
-        # ตรวจสอบว่าชื่อไฟล์ใน Google Sheets ตรงกับคำในวงเล็บนี้
+        # ตรวจสอบชื่อไฟล์ Google Sheets ของคุณให้ตรงกัน
         sheet = client.open("RedM_Account_DB").get_worksheet(0)
         return sheet
     except Exception as e:
-        st.error(f"การเชื่อมต่อผิดพลาด: {e}")
+        st.error(f"❌ การเชื่อมต่อผิดพลาด: {e}")
         return None
 
 # --- ฟังก์ชันหลักของระบบ ---
@@ -28,11 +40,16 @@ def main():
 
     sheet = connect_gsheet()
     if not sheet:
+        st.warning("⚠️ ไม่สามารถเชื่อมต่อฐานข้อมูลได้ โปรดเช็คการตั้งค่า Secrets หรือชื่อไฟล์ Google Sheets")
         return
 
-    # ดึงข้อมูลมาเก็บในรูปแบบ List of Dicts
-    all_data = sheet.get_all_records()
-    df = pd.DataFrame(all_data)
+    # ดึงข้อมูลทั้งหมด
+    try:
+        all_data = sheet.get_all_records()
+        df = pd.DataFrame(all_data)
+    except Exception as e:
+        st.error(f"ไม่สามารถดึงข้อมูลได้: {e}")
+        return
 
     # --- ส่วนที่ 1: การเพิ่มข้อมูลใหม่ ---
     with st.expander("➕ เพิ่มไอดีใหม่"):
@@ -50,27 +67,33 @@ def main():
                 new_note = st.text_area("หมายเหตุ")
             
             if st.form_submit_button("บันทึกข้อมูลใหม่"):
-                # คอลัมน์ต้องตรงกับโครงสร้างใน Google Sheets (10 คอลัมน์)
-                row_to_add = [new_id, new_email, new_pwd, new_hex, new_discord, "", new_server, new_ig_name, "", new_note]
-                sheet.append_row(row_to_add)
-                st.success("บันทึกเรียบร้อย!")
-                st.rerun()
+                if new_id and new_ig_name:
+                    # โครงสร้าง 10 คอลัมน์ตาม Google Sheets
+                    row_to_add = [new_id, new_email, new_pwd, new_hex, new_discord, "", new_server, new_ig_name, "", new_note]
+                    sheet.append_row(row_to_add)
+                    st.success("✅ บันทึกเรียบร้อย!")
+                    st.rerun()
+                else:
+                    st.error("กรุณากรอก Profile ID และ ชื่อในเกม")
 
     st.markdown("---")
 
-    # --- ส่วนที่ 2: ค้นหาและแสดงผลแบบการ์ด (จัดการ แก้ไข/ลบ) ---
+    # --- ส่วนที่ 2: ค้นหาและแสดงผลแบบการ์ด ---
     if not df.empty:
         search_query = st.text_input("🔍 ค้นหาไอดี (พิมพ์ชื่อในเกม หรือ ชื่อเซิร์ฟเวอร์)")
         
-        # กรองข้อมูลตามคำค้นหา
-        filtered_df = df[df.apply(lambda row: search_query.lower() in str(row).lower(), axis=1)]
+        # กรองข้อมูล
+        if search_query:
+            filtered_df = df[df.apply(lambda row: search_query.lower() in str(row).lower(), axis=1)]
+        else:
+            filtered_df = df
 
         for index, row in filtered_df.iterrows():
-            # หาเลขแถวที่แท้จริงใน Google Sheets (แถวที่ 1 คือ Header ดังนั้นต้อง +2)
+            # แถวใน Sheet (Header = 1, ข้อมูลเริ่มแถว 2)
             row_index_in_sheet = index + 2 
 
             with st.container(border=True):
-                col_info, col_action = st.columns([3, 1])
+                col_info, col_action = st.columns([3, 1.5])
 
                 with col_info:
                     st.markdown(f"### ID: {row['Profile_ID']} | **{row['In_Game_Name']}**")
@@ -80,29 +103,28 @@ def main():
                     show_pw = st.checkbox(f"แสดงรหัสผ่านของไอดี {row['Profile_ID']}", key=f"check_{index}")
                     pw_val = row['Password'] if show_pw else "********"
                     st.write(f"📧 **Email:** {row['Email']} | 🔑 **Pass:** `{pw_val}`")
-                    st.caption(f"📝 หมายเหตุ: {row['Note']}")
+                    if row.get('Note'):
+                        st.caption(f"📝 หมายเหตุ: {row['Note']}")
 
                 with col_action:
                     st.write("📋 **คัดลอกข้อมูล**")
                     st.code(row['Steam_Hex'], language="text")
-                    st.caption("Steam Hex (คลิกมุมขวาเพื่อ Copy)")
+                    st.caption("Steam Hex")
                     st.code(row['Discord_ID'], language="text")
                     st.caption("Discord ID")
 
-                    # ปุ่มแก้ไขและลบ
-                    btn_edit, btn_del = st.columns(2)
+                    # ปุ่มการจัดการ
+                    c_edit, c_del = st.columns(2)
                     
-                    # ส่วนการลบ (Delete)
-                    if btn_del.button("🗑️ ลบ", key=f"del_{index}"):
+                    if c_del.button("🗑️ ลบ", key=f"del_{index}", use_container_width=True):
                         sheet.delete_rows(row_index_in_sheet)
-                        st.warning(f"ลบไอดี {row['Profile_ID']} แล้ว")
+                        st.toast(f"ลบไอดี {row['Profile_ID']} เรียบร้อย")
                         st.rerun()
                     
-                    # ส่วนการแก้ไข (Update) - เปิด Modal/Expander เล็กๆ
-                    if btn_edit.button("⚙️ แก้ไข", key=f"edit_btn_{index}"):
+                    if c_edit.button("⚙️ แก้ไข", key=f"edit_btn_{index}", use_container_width=True):
                         st.session_state[f"edit_mode_{index}"] = True
 
-                # ถ้ากดปุ่มแก้ไข ให้โชว์ฟอร์มแก้ไขด้านล่างการ์ดนั้นๆ
+                # ส่วนการแก้ไขข้อมูล
                 if st.session_state.get(f"edit_mode_{index}", False):
                     with st.form(f"edit_form_{index}"):
                         st.write(f"✏️ กำลังแก้ไขโปรไฟล์ ID: {row['Profile_ID']}")
@@ -110,12 +132,17 @@ def main():
                         up_server = st.text_input("เซิร์ฟเวอร์", value=row['Server_Name'])
                         up_pwd = st.text_input("Password (ใหม่)", value=row['Password'])
                         
-                        if st.form_submit_button("ยืนยันการแก้ไข"):
-                            # อัปเดตทีละช่องใน Sheet (Column B, C, G, H ตามลำดับ)
-                            sheet.update_cell(row_index_in_sheet, 3, up_pwd)    # Col C
-                            sheet.update_cell(row_index_in_sheet, 7, up_server) # Col G
-                            sheet.update_cell(row_index_in_sheet, 8, up_ig)     # Col H
+                        btn_c1, btn_c2 = st.columns(2)
+                        if btn_c1.form_submit_button("✅ ยืนยันการแก้ไข"):
+                            # อัปเดต Column C, G, H (ลำดับที่ 3, 7, 8)
+                            sheet.update_cell(row_index_in_sheet, 3, up_pwd)
+                            sheet.update_cell(row_index_in_sheet, 7, up_server)
+                            sheet.update_cell(row_index_in_sheet, 8, up_ig)
                             st.success("อัปเดตข้อมูลสำเร็จ!")
+                            st.session_state[f"edit_mode_{index}"] = False
+                            st.rerun()
+                        
+                        if btn_c2.form_submit_button("❌ ยกเลิก"):
                             st.session_state[f"edit_mode_{index}"] = False
                             st.rerun()
     else:
