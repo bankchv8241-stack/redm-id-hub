@@ -10,17 +10,17 @@ import plotly.express as px
 APP_NAME = "REDM ID HUB PRO"
 st.set_page_config(page_title=APP_NAME, layout="wide", page_icon="🛡️")
 
-# --- 📍 Webhook URL เดิมของคุณ 📍 ---
+# --- 📍 Webhook URL ของคุณ 📍 ---
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1485029775729889551/BiNZOKI5QDMYp1IVCTKxrH6hMkfBOeip5lWHTh2y48dbvCzO8I7jX1AtAaVEkAXUZ74j" 
 
-# --- Custom CSS: Classic B&W ---
+# --- Custom CSS ---
 st.markdown("""
     <style>
     .stApp { background-color: #000000; color: #FFFFFF; font-family: 'Inter', sans-serif; }
     h1 { letter-spacing: 8px; text-transform: uppercase; font-weight: 900; text-shadow: 2px 2px 4px #222; text-align: center; }
     h3 { color: #00FBFF; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 20px; }
     .stTextInput>div>div>input { background-color: #0A0A0A !important; color: #FFFFFF !important; border: 1px solid #333 !important; }
-    .stButton>button { width: 100%; border-radius: 0px; border: 1px solid #FFFFFF; background-color: transparent; color: #FFFFFF; font-weight: bold; transition: all 0.4s ease; }
+    .stButton>button { width: 100%; border-radius: 0px; border: 1px solid #FFFFFF; background-color: transparent; color: #FFFFFF; font-weight: bold; }
     .stButton>button:hover { border-color: #00FBFF !important; color: #00FBFF !important; box-shadow: 0 0 20px rgba(0, 251, 255, 0.4); }
     [data-testid="stMetricValue"] { color: #00FBFF !important; font-family: 'Courier New', monospace; }
     [data-testid="stVerticalBlockBorderWrapper"] { border: 1px solid #222 !important; background-color: #050505 !important; }
@@ -62,7 +62,6 @@ def connect_gsheet():
 
 # --- Main App ---
 if check_password():
-    # แก้ไขหัวข้อให้แสดงผล HTML ได้ถูกต้อง (ไม่เพี้ยนแบบ Plain Text)
     st.markdown("<h1>REDM ID HUB PRO</h1>", unsafe_allow_html=True)
     sheet = connect_gsheet()
     
@@ -76,49 +75,45 @@ if check_password():
             m1, m2, m3 = st.columns([1, 2, 2])
             m1.metric("TOTAL ACCOUNTS", len(df))
             
-            if 'Server' in df.columns:
-                sv_counts = df['Server'].value_counts().reset_index()
-                # แก้ไขตัวพิมพ์ใหญ่เป็น CYAN_R เพื่อไม่ให้เกิด Error สีแดง
-                fig_sv = px.pie(sv_counts, values='count', names='Server', 
-                                title='ไอดีแยกตามเซิร์ฟเวอร์', 
-                                color_discrete_sequence=px.colors.sequential.CYAN_R,
-                                template="plotly_dark")
+            # กราฟแยกตามเซิร์ฟเวอร์
+            if any(c in df.columns for c in ['rm_sv', 'Server']):
+                col = 'rm_sv' if 'rm_sv' in df.columns else 'Server'
+                sv_counts = df[col].value_counts().reset_index()
+                sv_counts.columns = ['Name', 'Count']
+                fig_sv = px.pie(sv_counts, values='Count', names='Name', title='เซิร์ฟเวอร์', 
+                                color_discrete_sequence=px.colors.sequential.Icefire, template="plotly_dark")
                 fig_sv.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=250)
                 m2.plotly_chart(fig_sv, use_container_width=True)
             
-            if 'Profession' in df.columns:
-                prof_counts = df['Profession'].value_counts().reset_index()
-                fig_prof = px.bar(prof_counts, x='Profession', y='count', 
-                                  title='อาชีพที่คุณมี',
-                                  color='count', color_continuous_scale='Blues',
-                                  template="plotly_dark")
+            # กราฟแยกตามอาชีพ
+            if any(c in df.columns for c in ['rm_prof', 'Profession']):
+                col = 'rm_prof' if 'rm_prof' in df.columns else 'Profession'
+                prof_counts = df[col].value_counts().reset_index()
+                prof_counts.columns = ['Job', 'Count']
+                fig_prof = px.bar(prof_counts, x='Job', y='Count', title='อาชีพ',
+                                  color='Count', color_continuous_scale='Icefire', template="plotly_dark")
                 fig_prof.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=250)
                 m3.plotly_chart(fig_prof, use_container_width=True)
             st.markdown("---")
 
         # --- เพิ่มโปรไฟล์ใหม่ ---
         with st.expander("➕ เพิ่มโปรไฟล์ใหม่ (บันทึกข้อมูลแบบละเอียด)"):
-            with st.form("advanced_add_form", clear_on_submit=True):
-                st.markdown("### 1️⃣ Email")
-                c1, c2 = st.columns(2); m_user = c1.text_input("อีเมล (Email)"); m_pass = c2.text_input("พาสเวิร์ดเมล์ (Pass)")
-                st.markdown("### 2️⃣ Steam")
-                c3, c4 = st.columns(2); s_id = c3.text_input("ไอดีสตรีม (ID)"); s_pass = c4.text_input("พาสเวิร์ดสตรีม (Pass)")
-                s_mail = c3.text_input("อีเมลสำรองสตรีม"); s_tel = c4.text_input("เบอร์ลงทะเบียนสตรีม"); s_link = c3.text_input("ลิงก์โปรไฟล์สตรีม"); s_hex = c4.text_input("Steam Hex")
-                st.markdown("### 3️⃣ Discord")
-                c5, c6 = st.columns(2); d_mail = c5.text_input("อีเมลดิสคอร์ด"); d_pass = c6.text_input("พาสเวิร์ดดิสคอร์ด")
-                d_tel = c5.text_input("เบอร์ลงทะเบียนดิสคอร์ด"); d_id = c6.text_input("Discord User ID"); d_tag = c5.text_input("Discord Tag")
-                st.markdown("### 4️⃣ Rockstar")
-                c7, c8 = st.columns(2); rs_mail = c7.text_input("อีเมลร็อกสตาร์"); rs_pass = c8.text_input("พาสเวิร์ดร็อกสตาร์")
+            with st.form("add_form", clear_on_submit=True):
+                st.markdown("### 1️⃣ Email & 2️⃣ Steam")
+                c1, c2 = st.columns(2)
+                m_user = c1.text_input("Email"); m_pass = c2.text_input("Email Pass")
+                s_id = c1.text_input("Steam ID"); s_pass = c2.text_input("Steam Pass")
+                s_hex = c1.text_input("Steam Hex")
                 st.markdown("### 5️⃣ RedM Operations")
-                c9, c10 = st.columns(2); rm_sv = c9.text_input("ชื่อเซิร์ฟเวอร์"); rm_ip = c10.text_input("ไอพีเซิร์ฟเวอร์")
-                rm_link = c9.text_input("ลิงก์ดิสคอร์ดเซิร์ฟ"); rm_ic = c10.text_input("ชื่อในเกม (Name IC)"); rm_role = c9.text_input("โรลที่เล่น"); rm_prof = c10.text_input("อาชีพประจำตัว")
-
-                if st.form_submit_button("🔥 บันทึกข้อมูลเข้าระบบ"):
-                    new_row = [m_user, m_pass, s_id, s_pass, s_mail, s_tel, s_link, s_hex, d_mail, d_pass, d_tel, d_id, d_tag, rs_mail, rs_pass, rm_sv, rm_ip, rm_link, rm_ic, rm_role, rm_prof]
+                rm_sv = c1.text_input("Server"); rm_ic = c2.text_input("Name IC")
+                rm_role = c1.text_input("Role"); rm_prof = c2.text_input("Profession")
+                if st.form_submit_button("🔥 บันทึกข้อมูล"):
+                    # รวบรวมข้อมูลตามลำดับคอลัมน์ใน Sheet ของคุณ
+                    new_row = [m_user, m_pass, s_id, s_pass, "", "", "", s_hex, "", "", "", "", "", "", "", rm_sv, "", "", rm_ic, rm_role, rm_prof]
                     sheet.append_row(new_row)
-                    st.success("บันทึกข้อมูลสำเร็จ!"); st.rerun()
+                    st.success("บันทึกสำเร็จ!"); st.rerun()
 
-        # --- ส่วนแสดงผลและการค้นหา พร้อมปุ่มคัดลอกรายช่อง ---
+        # --- ค้นหาและแสดงผล ---
         if not df.empty:
             search = st.text_input("🔍 ค้นหา (ชื่อ IC / เซิร์ฟ / Steam Hex)")
             f_df = df[df.apply(lambda r: search.lower() in str(r).lower(), axis=1)] if search else df
@@ -126,23 +121,15 @@ if check_password():
             for idx, row in f_df.iterrows():
                 row_dict = row.to_dict()
                 with st.container(border=True):
-                    col_info, col_btn = st.columns([4, 1.2])
-                    with col_info:
-                        st.markdown(f"### {row_dict.get('Name_IC', 'N/A')} // {row_dict.get('Server', 'N/A')}")
-                        st.write(f"🎭 **Role:** {row_dict.get('Role', 'N/A')} | 💼 **Job:** {row_dict.get('Profession', 'N/A')}")
-                        
-                        if st.checkbox(f"🔓 เปิดดูข้อมูลและคัดลอกรายช่อง", key=f"v_{idx}"):
-                            st.markdown("---")
-                            for label, value in row_dict.items():
-                                if value:
-                                    c_lab, c_val, c_cp = st.columns([1.5, 3, 1])
-                                    c_lab.markdown(f"**{label}:**")
-                                    c_val.code(str(value), language="text")
-                                    if c_cp.button("📋 COPY", key=f"cp_{idx}_{label}"):
-                                        st.write(f'<script>navigator.clipboard.writeText("{value}")</script>', unsafe_allow_html=True)
-                                        st.toast(f"คัดลอก {label} แล้ว!", icon="✅")
-                    with col_btn:
-                        st.code(row_dict.get('Steam_Hex', 'N/A'))
-                        if st.button("🗑️ ลบข้อมูล", key=f"d_{idx}"):
-                            sheet.delete_rows(idx + 2)
-                            st.rerun()
+                    ic = row_dict.get('rm_ic') or row_dict.get('Name_IC') or 'N/A'
+                    sv = row_dict.get('rm_sv') or row_dict.get('Server') or 'N/A'
+                    st.markdown(f"### {ic} // {sv}")
+                    if st.checkbox(f"🔓 เปิดดูข้อมูลและคัดลอก", key=f"v_{idx}"):
+                        for label, value in row_dict.items():
+                            if value:
+                                cl1, cl2, cl3 = st.columns([1.5, 3, 1])
+                                cl1.write(f"**{label}**")
+                                cl2.code(str(value), language="text")
+                                if cl3.button("📋 COPY", key=f"cp_{idx}_{label}"):
+                                    st.write(f'<script>navigator.clipboard.writeText("{value}")</script>', unsafe_allow_html=True)
+                                    st.toast(f"คัดลอก {label} แล้ว!")
