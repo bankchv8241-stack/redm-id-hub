@@ -13,11 +13,11 @@ st.set_page_config(page_title=APP_NAME, layout="wide", page_icon="🛡️")
 # --- 📍 Webhook URL ของคุณ ---
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1485029775729889551/BiNZOKI5QDMYp1IVCTKxrH6hMkfBOeip5lWHTh2y48dbvCzO8I7jX1AtAaVEkAXUZ74j" 
 
-# --- Custom CSS: Classic B&W & Cyber Theme ---
+# --- Custom CSS: Classic B&W ---
 st.markdown("""
     <style>
     .stApp { background-color: #000000; color: #FFFFFF; font-family: 'Inter', sans-serif; }
-    h1 { letter-spacing: 8px; text-transform: uppercase; font-weight: 900; text-shadow: 2px 2px 4px #222; text-align: center; margin-bottom: 20px; }
+    h1 { letter-spacing: 8px; text-transform: uppercase; font-weight: 900; text-shadow: 2px 2px 4px #222; text-align: center; margin-bottom: 25px; }
     h3 { color: #00FBFF; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 20px; }
     .stTextInput>div>div>input { background-color: #0A0A0A !important; color: #FFFFFF !important; border: 1px solid #333 !important; }
     .stButton>button { width: 100%; border-radius: 0px; border: 1px solid #FFFFFF; background-color: transparent; color: #FFFFFF; font-weight: bold; transition: all 0.4s ease; }
@@ -72,7 +72,6 @@ def connect_gsheet():
 
 # --- Main App ---
 if check_password():
-    # แสดงหัวข้อแอปแบบ HTML
     st.markdown("<h1>REDM ID HUB PRO</h1>", unsafe_allow_html=True)
     sheet, log_sheet = connect_gsheet()
     
@@ -86,54 +85,55 @@ if check_password():
             m1, m2, m3 = st.columns([1, 2, 2])
             m1.metric("TOTAL ACCOUNTS", len(df))
             
-            # กราฟแยกตามเซิร์ฟเวอร์ (ใช้ชุดสีที่ปลอดภัย)
+            # กราฟแยกตามเซิร์ฟเวอร์ (ใช้สีที่ปลอดภัย)
             if 'Server' in df.columns:
                 sv_counts = df['Server'].value_counts().reset_index()
-                fig_sv = px.pie(sv_counts, values='count', names='Server', 
-                                title='ไอดีแยกตามเซิร์ฟเวอร์', 
-                                color_discrete_sequence=px.colors.qualitative.Safe,
-                                template="plotly_dark")
+                fig_sv = px.pie(sv_counts, values='count', names='Server', title='แยกตามเซิร์ฟเวอร์', 
+                                color_discrete_sequence=px.colors.qualitative.Safe, template="plotly_dark")
                 fig_sv.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=250)
                 m2.plotly_chart(fig_sv, use_container_width=True)
             
-            # กราฟแยกตามอาชีพ
             if 'Profession' in df.columns:
                 prof_counts = df['Profession'].value_counts().reset_index()
-                fig_prof = px.bar(prof_counts, x='Profession', y='count', 
-                                  title='อาชีพที่คุณมี',
-                                  color='count', color_continuous_scale='Blues',
-                                  template="plotly_dark")
+                fig_prof = px.bar(prof_counts, x='Profession', y='count', title='แยกตามอาชีพ',
+                                  template="plotly_dark", color_discrete_sequence=['#00FBFF'])
                 fig_prof.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=250)
                 m3.plotly_chart(fig_prof, use_container_width=True)
             st.markdown("---")
 
-        # --- ➕ ระบบบันทึกโปรไฟล์ใหม่ (นำกลับมาแล้ว) ---
-        with st.expander("➕ เพิ่มโปรไฟล์ใหม่ (บันทึกข้อมูลแบบละเอียด)"):
-            with st.form("advanced_add_form", clear_on_submit=True):
-                st.markdown("### 1️⃣ Email & 2️⃣ Steam")
-                c1, c2 = st.columns(2)
-                m_user = c1.text_input("อีเมล (Email)"); m_pass = c2.text_input("พาสเวิร์ดเมล์ (Pass)")
-                s_id = c1.text_input("ไอดีสตรีม (ID)"); s_pass = c2.text_input("พาสเวิร์ดสตรีม (Pass)")
-                s_hex = c1.text_input("Steam Hex")
+        # --- ➕ ระบบบันทึกโปรไฟล์ใหม่ (โชว์ฟอร์มทันทีไม่ต้องเปิด Expander) ---
+        st.markdown("### ➕ เพิ่มโปรไฟล์ใหม่ (บันทึกข้อมูลแบบละเอียด)")
+        with st.form("advanced_add_form", clear_on_submit=True):
+            # จัดกลุ่มข้อมูลตามโครงสร้างเดิมใน main.py
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("#### 1️⃣ Email & Steam")
+                m_user = st.text_input("อีเมล (Email)")
+                m_pass = st.text_input("พาสเวิร์ดเมล์ (Pass)")
+                s_id = st.text_input("ไอดีสตรีม (ID)")
+                s_pass = st.text_input("พาสเวิร์ดสตรีม (Pass)")
+                s_hex = st.text_input("Steam Hex")
+            with c2:
+                st.markdown("#### 5️⃣ RedM Operations")
+                rm_sv = st.text_input("ชื่อเซิร์ฟเวอร์ (Server)")
+                rm_ic = st.text_input("ชื่อในเกม (Name IC)")
+                rm_role = st.text_input("โรลที่เล่น (Role)")
+                rm_prof = st.text_input("อาชีพประจำตัว (Profession)")
 
-                st.markdown("### 5️⃣ RedM Operations")
-                c3, c4 = st.columns(2)
-                rm_sv = c3.text_input("ชื่อเซิร์ฟเวอร์ (Server)"); rm_ic = c4.text_input("ชื่อในเกม (Name IC)")
-                rm_role = c3.text_input("โรลที่เล่น (Role)"); rm_prof = c4.text_input("อาชีพประจำตัว (Profession)")
+            if st.form_submit_button("🔥 บันทึกข้อมูลเข้าระบบ"):
+                # ลำดับข้อมูลให้ตรงกับ Google Sheet
+                new_row = [m_user, m_pass, s_id, s_pass, "", "", "", s_hex, "", "", "", "", "", "", "", rm_sv, "", "", rm_ic, rm_role, rm_prof]
+                sheet.append_row(new_row)
+                
+                # Log & Discord
+                log_msg = f"เพิ่มข้อมูล: {rm_ic} | เซิร์ฟ: {rm_sv}"
+                log_sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), log_msg])
+                send_discord_log("NEW OPERATIVE REGISTERED", f"**IC Name:** {rm_ic}\n**Server:** {rm_sv}")
+                
+                st.success("บันทึกข้อมูลสำเร็จ!"); st.rerun()
 
-                if st.form_submit_button("🔥 บันทึกข้อมูลเข้าระบบ"):
-                    # ลำดับข้อมูลตามคอลัมน์ใน Google Sheets
-                    new_row = [m_user, m_pass, s_id, s_pass, "", "", "", s_hex, "", "", "", "", "", "", "", rm_sv, "", "", rm_ic, rm_role, rm_prof]
-                    sheet.append_row(new_row)
-                    
-                    # บันทึก Log และส่ง Discord
-                    log_msg = f"เพิ่มข้อมูล: {rm_ic} | เซิร์ฟ: {rm_sv}"
-                    log_sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), log_msg])
-                    send_discord_log("NEW OPERATIVE REGISTERED", f"**IC Name:** {rm_ic}\n**Server:** {rm_sv}\n**Role:** {rm_role}")
-                    
-                    st.success("บันทึกข้อมูลสำเร็จ!"); st.rerun()
-
-        # --- ส่วนแสดงผลและการค้นหา ---
+        # --- ส่วนค้นหาและแสดงผล ---
+        st.markdown("---")
         if not df.empty:
             search = st.text_input("🔍 ค้นหา (ชื่อ IC / เซิร์ฟ / Steam Hex)")
             f_df = df[df.apply(lambda r: search.lower() in str(r).lower(), axis=1)] if search else df
@@ -144,19 +144,16 @@ if check_password():
                     col_info, col_btn = st.columns([4, 1.2])
                     with col_info:
                         st.markdown(f"### {row_dict.get('Name_IC', 'N/A')} // {row_dict.get('Server', 'N/A')}")
-                        if st.checkbox(f"🔓 เปิดดูข้อมูลและคัดลอกรายช่อง", key=f"v_{idx}"):
-                            st.markdown("---")
+                        if st.checkbox(f"🔓 ดูข้อมูลและคัดลอกรายช่อง", key=f"v_{idx}"):
                             for label, value in row_dict.items():
                                 if value:
                                     c_lab, c_val, c_cp = st.columns([1.5, 3, 1])
-                                    c_lab.markdown(f"**{label}:**")
+                                    c_lab.write(f"**{label}:**")
                                     c_val.code(str(value), language="text")
                                     if c_cp.button("📋 COPY", key=f"cp_{idx}_{label}"):
-                                        # ใช้ Javascript เล็กน้อยเพื่อให้ Copy ได้จริงบน Browser
                                         st.write(f'<script>navigator.clipboard.writeText("{value}")</script>', unsafe_allow_html=True)
-                                        st.toast(f"คัดลอก {label} แล้ว!", icon="✅")
+                                        st.toast(f"คัดลอก {label} แล้ว!")
                     with col_btn:
                         st.code(row_dict.get('Steam_Hex', 'N/A'))
                         if st.button("🗑️ ลบข้อมูล", key=f"d_{idx}"):
-                            sheet.delete_rows(idx + 2)
-                            st.rerun()
+                            sheet.delete_rows(idx + 2); st.rerun()
