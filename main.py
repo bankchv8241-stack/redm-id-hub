@@ -10,25 +10,36 @@ import plotly.express as px
 APP_NAME = "REDM ID HUB PRO"
 st.set_page_config(page_title=APP_NAME, layout="wide", page_icon="🛡️")
 
-# --- Webhook URL เดิมของคุณ ---
+# --- 📍 Webhook URL ของคุณ ---
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1485029775729889551/BiNZOKI5QDMYp1IVCTKxrH6hMkfBOeip5lWHTh2y48dbvCzO8I7jX1AtAaVEkAXUZ74j" 
 
-# --- Custom CSS: แก้ไขหัวข้อและสี ---
+# --- Custom CSS: Classic B&W & Cyber Theme ---
 st.markdown("""
     <style>
-    .stApp { background-color: #000000; color: #FFFFFF; }
-    h1 { letter-spacing: 8px; text-transform: uppercase; font-weight: 900; text-align: center; }
-    [data-testid="stMetricValue"] { color: #00FBFF !important; }
-    .stButton>button { width: 100%; border: 1px solid #FFFFFF; background-color: transparent; color: #FFFFFF; }
-    .stButton>button:hover { border-color: #00FBFF !important; color: #00FBFF !important; }
-    code { color: #00FBFF !important; background-color: #111 !important; }
+    .stApp { background-color: #000000; color: #FFFFFF; font-family: 'Inter', sans-serif; }
+    h1 { letter-spacing: 8px; text-transform: uppercase; font-weight: 900; text-shadow: 2px 2px 4px #222; text-align: center; margin-bottom: 20px; }
+    h3 { color: #00FBFF; border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 20px; }
+    .stTextInput>div>div>input { background-color: #0A0A0A !important; color: #FFFFFF !important; border: 1px solid #333 !important; }
+    .stButton>button { width: 100%; border-radius: 0px; border: 1px solid #FFFFFF; background-color: transparent; color: #FFFFFF; font-weight: bold; transition: all 0.4s ease; }
+    .stButton>button:hover { border-color: #00FBFF !important; color: #00FBFF !important; box-shadow: 0 0 20px rgba(0, 251, 255, 0.4); }
+    [data-testid="stMetricValue"] { color: #00FBFF !important; font-family: 'Courier New', monospace; }
+    [data-testid="stVerticalBlockBorderWrapper"] { border: 1px solid #222 !important; background-color: #050505 !important; }
+    code { color: #00FBFF !important; background-color: #111 !important; border: 1px solid #222 !important; }
     </style>
     """, unsafe_allow_html=True)
+
+# --- ฟังก์ชันส่ง Discord ---
+def send_discord_log(action, detail):
+    if DISCORD_WEBHOOK_URL:
+        try:
+            data = {"embeds": [{"title": f"🔔 {action}", "description": detail, "color": 0x00fbff, "timestamp": datetime.now().isoformat()}]}
+            requests.post(DISCORD_WEBHOOK_URL, json=data)
+        except: pass
 
 # --- ระบบ Login ---
 def check_password():
     if "password_correct" not in st.session_state:
-        st.markdown("<br><br><h2 style='text-align: center;'>🔒 ACCESS RESTRICTED</h2>", unsafe_allow_html=True)
+        st.markdown("<br><br><br><h2 style='text-align: center;'>🔒 ACCESS RESTRICTED</h2>", unsafe_allow_html=True)
         col1, col2, col3 = st.columns([1, 1.5, 1])
         with col2:
             password = st.text_input("ENTER AUTHORIZATION CODE", type="password")
@@ -39,6 +50,7 @@ def check_password():
                 else: st.error("INVALID AUTHORIZATION")
         return False
     return True
+
 # --- เชื่อมต่อฐานข้อมูล ---
 @st.cache_resource
 def connect_gsheet():
@@ -50,54 +62,101 @@ def connect_gsheet():
             creds = ServiceAccountCredentials.from_json_keyfile_dict(info, scope)
         else: creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
         client = gspread.authorize(creds)
-        return client.open("RedM_Account_DB").get_worksheet(0)
+        spreadsheet = client.open("RedM_Account_DB")
+        sheet = spreadsheet.get_worksheet(0)
+        try: log_sheet = spreadsheet.worksheet("Activity_Logs")
+        except: log_sheet = spreadsheet.add_worksheet(title="Activity_Logs", rows="100", cols="2")
+        return sheet, log_sheet
     except Exception as e:
-        st.error(f"SYSTEM ERROR: {e}"); return None
+        st.error(f"SYSTEM ERROR: {e}"); return None, None
 
 # --- Main App ---
 if check_password():
-    # แก้ไขหัวข้อให้แสดงผลสวยงาม
+    # แสดงหัวข้อแอปแบบ HTML
     st.markdown("<h1>REDM ID HUB PRO</h1>", unsafe_allow_html=True)
-    sheet = connect_gsheet()
+    sheet, log_sheet = connect_gsheet()
     
     if sheet:
-        df = pd.DataFrame(sheet.get_all_records())
+        all_data = sheet.get_all_records()
+        df = pd.DataFrame(all_data)
 
+        # --- 📊 DASHBOARD SECTION ---
         if not df.empty:
             st.markdown("### 📈 Visual Analytics")
             m1, m2, m3 = st.columns([1, 2, 2])
             m1.metric("TOTAL ACCOUNTS", len(df))
             
-            # แก้ Error สีแดง โดยใช้ชุดสีมาตรฐาน Plotly
+            # กราฟแยกตามเซิร์ฟเวอร์ (ใช้ชุดสีที่ปลอดภัย)
             if 'Server' in df.columns:
-                fig_sv = px.pie(df, names='Server', title='แยกตามเซิร์ฟเวอร์', 
-                                color_discrete_sequence=px.colors.qualitative.Safe, template="plotly_dark")
+                sv_counts = df['Server'].value_counts().reset_index()
+                fig_sv = px.pie(sv_counts, values='count', names='Server', 
+                                title='ไอดีแยกตามเซิร์ฟเวอร์', 
+                                color_discrete_sequence=px.colors.qualitative.Safe,
+                                template="plotly_dark")
+                fig_sv.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=250)
                 m2.plotly_chart(fig_sv, use_container_width=True)
             
+            # กราฟแยกตามอาชีพ
             if 'Profession' in df.columns:
-                fig_prof = px.bar(df, x='Profession', title='แยกตามอาชีพ', 
-                                  template="plotly_dark", color_discrete_sequence=['#00FBFF'])
+                prof_counts = df['Profession'].value_counts().reset_index()
+                fig_prof = px.bar(prof_counts, x='Profession', y='count', 
+                                  title='อาชีพที่คุณมี',
+                                  color='count', color_continuous_scale='Blues',
+                                  template="plotly_dark")
+                fig_prof.update_layout(margin=dict(t=30, b=0, l=0, r=0), height=250)
                 m3.plotly_chart(fig_prof, use_container_width=True)
+            st.markdown("---")
 
-        # --- ส่วนแสดงข้อมูลและปุ่ม COPY ---
-        search = st.text_input("🔍 ค้นหาไอดี")
-        f_df = df[df.apply(lambda r: search.lower() in str(r).lower(), axis=1)] if search else df
-        
-        for idx, row in f_df.iterrows():
-            with st.container(border=True):
-                c_info, c_btn = st.columns([4, 1.2])
-                with c_info:
-                    st.markdown(f"### {row.get('Name_IC', 'N/A')} // {row.get('Server', 'N/A')}")
-                    if st.checkbox(f"🔓 เปิดดูข้อมูลรายช่อง", key=f"v_{idx}"):
-                        for k, v in row.to_dict().items():
-                            if v:
-                                col_l, col_v, col_cp = st.columns([1.5, 3, 1])
-                                col_l.write(f"**{k}**")
-                                col_v.code(str(v), language="text")
-                                if col_cp.button("📋 COPY", key=f"cp_{idx}_{k}"):
-                                    st.write(f'<script>navigator.clipboard.writeText("{v}")</script>', unsafe_allow_html=True)
-                                    st.toast(f"คัดลอก {k} แล้ว!")
-                with c_btn:
-                    st.code(row.get('Steam_Hex', 'N/A'))
-                    if st.button("🗑️ ลบ", key=f"d_{idx}"):
-                        sheet.delete_rows(idx + 2); st.rerun()
+        # --- ➕ ระบบบันทึกโปรไฟล์ใหม่ (นำกลับมาแล้ว) ---
+        with st.expander("➕ เพิ่มโปรไฟล์ใหม่ (บันทึกข้อมูลแบบละเอียด)"):
+            with st.form("advanced_add_form", clear_on_submit=True):
+                st.markdown("### 1️⃣ Email & 2️⃣ Steam")
+                c1, c2 = st.columns(2)
+                m_user = c1.text_input("อีเมล (Email)"); m_pass = c2.text_input("พาสเวิร์ดเมล์ (Pass)")
+                s_id = c1.text_input("ไอดีสตรีม (ID)"); s_pass = c2.text_input("พาสเวิร์ดสตรีม (Pass)")
+                s_hex = c1.text_input("Steam Hex")
+
+                st.markdown("### 5️⃣ RedM Operations")
+                c3, c4 = st.columns(2)
+                rm_sv = c3.text_input("ชื่อเซิร์ฟเวอร์ (Server)"); rm_ic = c4.text_input("ชื่อในเกม (Name IC)")
+                rm_role = c3.text_input("โรลที่เล่น (Role)"); rm_prof = c4.text_input("อาชีพประจำตัว (Profession)")
+
+                if st.form_submit_button("🔥 บันทึกข้อมูลเข้าระบบ"):
+                    # ลำดับข้อมูลตามคอลัมน์ใน Google Sheets
+                    new_row = [m_user, m_pass, s_id, s_pass, "", "", "", s_hex, "", "", "", "", "", "", "", rm_sv, "", "", rm_ic, rm_role, rm_prof]
+                    sheet.append_row(new_row)
+                    
+                    # บันทึก Log และส่ง Discord
+                    log_msg = f"เพิ่มข้อมูล: {rm_ic} | เซิร์ฟ: {rm_sv}"
+                    log_sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), log_msg])
+                    send_discord_log("NEW OPERATIVE REGISTERED", f"**IC Name:** {rm_ic}\n**Server:** {rm_sv}\n**Role:** {rm_role}")
+                    
+                    st.success("บันทึกข้อมูลสำเร็จ!"); st.rerun()
+
+        # --- ส่วนแสดงผลและการค้นหา ---
+        if not df.empty:
+            search = st.text_input("🔍 ค้นหา (ชื่อ IC / เซิร์ฟ / Steam Hex)")
+            f_df = df[df.apply(lambda r: search.lower() in str(r).lower(), axis=1)] if search else df
+            
+            for idx, row in f_df.iterrows():
+                row_dict = row.to_dict()
+                with st.container(border=True):
+                    col_info, col_btn = st.columns([4, 1.2])
+                    with col_info:
+                        st.markdown(f"### {row_dict.get('Name_IC', 'N/A')} // {row_dict.get('Server', 'N/A')}")
+                        if st.checkbox(f"🔓 เปิดดูข้อมูลและคัดลอกรายช่อง", key=f"v_{idx}"):
+                            st.markdown("---")
+                            for label, value in row_dict.items():
+                                if value:
+                                    c_lab, c_val, c_cp = st.columns([1.5, 3, 1])
+                                    c_lab.markdown(f"**{label}:**")
+                                    c_val.code(str(value), language="text")
+                                    if c_cp.button("📋 COPY", key=f"cp_{idx}_{label}"):
+                                        # ใช้ Javascript เล็กน้อยเพื่อให้ Copy ได้จริงบน Browser
+                                        st.write(f'<script>navigator.clipboard.writeText("{value}")</script>', unsafe_allow_html=True)
+                                        st.toast(f"คัดลอก {label} แล้ว!", icon="✅")
+                    with col_btn:
+                        st.code(row_dict.get('Steam_Hex', 'N/A'))
+                        if st.button("🗑️ ลบข้อมูล", key=f"d_{idx}"):
+                            sheet.delete_rows(idx + 2)
+                            st.rerun()
