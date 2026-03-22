@@ -25,6 +25,20 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# --- ระบบส่ง Discord Log ---
+def send_discord_log(action, ic_name, server):
+    if DISCORD_WEBHOOK_URL:
+        try:
+            payload = {
+                "embeds": [{
+                    "title": f"🔔 {action}",
+                    "description": f"**IC Name:** {ic_name}\n**Server:** {server}\n**Timestamp:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                    "color": 0x00fbff
+                }]
+            }
+            requests.post(DISCORD_WEBHOOK_URL, json=payload)
+        except: pass
+
 # --- ระบบ Login ---
 def check_password():
     if "password_correct" not in st.session_state:
@@ -53,15 +67,13 @@ def connect_gsheet():
         client = gspread.authorize(creds)
         spreadsheet = client.open("RedM_Account_DB")
         sheet = spreadsheet.get_worksheet(0)
-        try: log_sheet = spreadsheet.worksheet("Activity_Logs")
-        except: log_sheet = spreadsheet.add_worksheet(title="Activity_Logs", rows="100", cols="2")
-        return sheet, log_sheet
-    except: return None, None
+        return sheet
+    except: return None
 
 # --- Main App ---
 if check_password():
     st.markdown("<h1>REDM ID HUB PRO</h1>", unsafe_allow_html=True)
-    sheet, log_sheet = connect_gsheet()
+    sheet = connect_gsheet()
     
     if sheet:
         data = sheet.get_all_records()
@@ -72,14 +84,14 @@ if check_password():
             m1, m2, m3 = st.columns([1, 2, 2])
             m1.metric("TOTAL ACCOUNTS", len(df))
             if 'Server' in df.columns:
-                fig_sv = px.pie(df, names='Server', title='แยกตามเซิร์ฟเวอร์', color_discrete_sequence=px.colors.qualitative.Safe, template="plotly_dark")
+                fig_sv = px.pie(df, names='Server', title='เซิร์ฟเวอร์ที่เล่น', color_discrete_sequence=px.colors.qualitative.Safe, template="plotly_dark")
                 m2.plotly_chart(fig_sv, use_container_width=True)
             if 'Profession' in df.columns:
-                fig_prof = px.bar(df, x='Profession', title='แยกตามอาชีพ', template="plotly_dark", color_discrete_sequence=['#00FBFF'])
+                fig_prof = px.bar(df, x='Profession', title='สถิติสายอาชีพ', template="plotly_dark", color_discrete_sequence=['#00FBFF'])
                 m3.plotly_chart(fig_prof, use_container_width=True)
             st.markdown("---")
 
-        # --- ➕ แบบฟอร์ม 5 ส่วน (จัดลำดับใหม่ให้ตรง Sheet) ---
+        # --- ➕ แบบฟอร์ม 5 ส่วน ---
         with st.expander("➕ เพิ่มโปรไฟล์ใหม่ (บันทึกข้อมูลแบบละเอียด)", expanded=False):
             with st.form("advanced_add_form", clear_on_submit=True):
                 st.markdown("### 1️⃣ Email")
@@ -119,32 +131,40 @@ if check_password():
                 rm_prof = c10.text_input("อาชีพประจำตัว (Profession)")
 
                 if st.form_submit_button("🔥 บันทึกข้อมูลเข้าระบบ"):
-                    # ลำดับข้อมูลใหม่ตามภาพ Screenshot ล่าสุด
+                    # ลำดับข้อมูลให้ตรงกับ Google Sheets
                     new_row = [
                         m_user, m_pass,                     # Mail_User, Mail_Pass
                         s_id, s_pass, s_mail, s_tel, s_link, s_hex, # Steam Section
-                        d_mail, d_pass, d_tel, d_id, d_tag, # Discord Section (Mail, Pass, Tel, ID, Tag)
+                        d_mail, d_pass, d_tel, d_id, d_tag, # Discord Section
                         rs_mail, rs_pass,                   # Rockstar Section
                         rm_sv, rm_ip, rm_link, rm_ic, rm_role, rm_prof # RedM Section
                     ]
                     sheet.append_row(new_row)
-                    st.success("บันทึกสำเร็จ!"); st.rerun()
+                    send_discord_log("NEW DATA ADDED", rm_ic, rm_sv)
+                    st.success(f"บันทึกข้อมูล {rm_ic} สำเร็จ!"); st.rerun()
 
-        # --- 🔍 ค้นหาและคัดลอก (ใช้ระบบ st.code เพื่อความชัวร์ในการ Copy) ---
+        # --- 🔍 ค้นหาและคัดลอก ---
         st.markdown("---")
         search = st.text_input("🔍 ค้นหา (ชื่อ IC / เซิร์ฟ / Steam Hex)")
         if not df.empty:
+            # ใช้คอลัมน์จริงจาก Sheet ในการกรอง
             f_df = df[df.apply(lambda r: search.lower() in str(r).lower(), axis=1)] if search else df
+            
             for idx, row in f_df.iterrows():
                 with st.container(border=True):
                     col_info, col_del = st.columns([4, 1])
                     with col_info:
-                        st.markdown(f"### {row.get('Name_IC', 'N/A')} // {row.get('Server', 'N/A')}")
-                        if st.checkbox(f"🔓 เปิดดูข้อมูลและคัดลอกรายช่อง", key=f"v_{idx}"):
+                        # แสดงหัวข้อเป็น ชื่อ IC และ เซิร์ฟเวอร์
+                        ic_name = row.get('Name_IC', 'N/A')
+                        server_name = row.get('Server', 'N/A')
+                        st.markdown(f"### 👤 {ic_name} // 🌐 {server_name}")
+                        
+                        if st.checkbox(f"🔓 คลิกเพื่อเปิดดูและคัดลอกข้อมูล", key=f"v_{idx}"):
                             for label, value in row.to_dict().items():
                                 if value:
                                     st.write(f"**{label}:**")
-                                    st.code(str(value), language="text") # ปุ่ม Copy จะอยู่ที่มุมขวาบนของช่อง Code
+                                    st.code(str(value), language="text") 
                     with col_del:
-                        if st.button("🗑️ ลบข้อมูล", key=f"d_{idx}"):
-                            sheet.delete_rows(idx + 2); st.rerun()
+                        if st.button("🗑️ ลบไอดีนี้", key=f"d_{idx}"):
+                            sheet.delete_rows(idx + 2)
+                            st.warning("ลบข้อมูลเรียบร้อยแล้ว"); st.rerun()
