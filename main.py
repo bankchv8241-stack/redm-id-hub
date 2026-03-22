@@ -131,15 +131,16 @@ if check_password():
                 rm_prof = c10.text_input("อาชีพประจำตัว (Profession)")
 
                 if st.form_submit_button("🔥 บันทึกข้อมูลเข้าระบบ"):
-                    # ลำดับข้อมูลให้ตรงกับ Google Sheets
+                    # ลำดับข้อมูลที่แก้ไขใหม่ให้ตรงกับ Google Sheets (คอลัมน์ 1-21)
                     new_row = [
-                        m_user, m_pass,                     # Mail_User, Mail_Pass
-                        s_id, s_pass, s_mail, s_tel, s_link, s_hex, # Steam Section
-                        d_mail, d_pass, d_tel, d_id, d_tag, # Discord Section
-                        rs_mail, rs_pass,                   # Rockstar Section
-                        rm_sv, rm_ip, rm_link, rm_ic, rm_role, rm_prof # RedM Section
+                        m_user, m_pass,                     # 1-2: Mail User/Pass
+                        s_id, s_pass, s_mail, s_tel, s_link, s_hex, # 3-8: Steam Section
+                        d_mail, d_pass, d_tel, d_id, d_tag, # 9-13: Discord Section (Mail, Pass, Tel, ID, Tag) ✅ แก้ตรงนี้
+                        rs_mail, rs_pass,                   # 14-15: Rockstar Section
+                        rm_sv, rm_ip, rm_link, rm_ic, rm_role, rm_prof # 16-21: RedM Section
                     ]
                     sheet.append_row(new_row)
+                    # เพิ่มระบบแจ้งเตือนเข้า Discord Webhook
                     send_discord_log("NEW DATA ADDED", rm_ic, rm_sv)
                     st.success(f"บันทึกข้อมูล {rm_ic} สำเร็จ!"); st.rerun()
 
